@@ -1,0 +1,226 @@
+#!/bin/bash
+
+DESCRIPTION_TEXT="\n
+The clone script performs git clones for the purpose\n
+of managing a local git server. Git clones are\n
+organized into the appropriate directories based on\n
+the user and repository names from the provided url(s).\n
+For example this git url:\n
+\n
+   https://github.com/unitedstates/glossary.git\n
+\n
+results in a repository cloned into this directory:\n
+\n
+   ./unitedstates/glossary/\n
+\n
+The script is able to accept single git urls, a file\n
+with git urls on each line, or it can clone all\n
+repositories for a given user or organization.\n
+\n
+Note that bulk cloning of a users or organizations\n
+repositories and getting repository information is\n
+specific to github.com. All other operations pass the\n
+provided urls to the git clone command directly.\n
+\n
+The default root directory for file operations is the\n
+directory where the script is located.\n
+"
+EXAMPLE_TEXT="\n
+Examples:\n
+\n
+Clone a single git repository:\n
+   ./clone https://github.com/otisbyron/git\n
+\n
+Clone git repositories from a list of urls in a file:\n
+   ./clone -f git_urls.list\n
+\n
+Clone all git repositories belonging to a user:\n
+   ./clone -u markqvist\n
+\n
+Capture info for all git repositories belonging to an\n
+organization with a 2 second delay between each request:\n
+   ./clone -i -d 2 -o unitedstates > git_unitedstates.info\n
+\n
+"
+SHORT_HELP_TEXT="\n
+Available options:\n
+\n
+[url]\t\t	use single repo url [url]\n
+-f [file]\t	use repo urls from file [file]\n
+-u [user]\t	use all repo urls for [user]\n
+-o [org]\t	use all repo urls for [org]\n
+-i\t\t		return json info only, no cloning\n
+-t [token]\t	use auth token [token] (use with -i)\n
+-d [delay]\t	delay [delay] seconds between requests\n
+-r [dir]\t	use [dir] as root directory for cloning\n
+-q\t\t		quiet output\n
+-h\t\t		show full help message\n
+"
+
+
+function git_clone {
+	
+	URL=$1
+	SPLIT="$(echo $URL | cut -d'.' -f2)"
+	USER="$(echo $SPLIT | cut -d'/' -f2)"
+	REPO="$(echo $SPLIT | cut -d'/' -f3)"
+	
+	if [ ! -d $ROOT/$USER ]
+	then
+		mkdir $ROOT/$USER
+	fi
+
+	if [ ! -d $ROOT/$USER/$REPO ]
+	then
+		if [ "$QUITE_MODE" = "1" ]
+		then
+			git clone -q $URL $ROOT/$USER/$REPO
+		else
+			git clone $URL $ROOT/$USER/$REPO
+		fi
+	else
+		echo "$USER/$REPO exists, skipping"
+	fi
+}
+
+function git_info {
+	
+	URL=$1
+	SPLIT="$(echo $URL | cut -d'.' -f2)"
+	USER="$(echo $SPLIT | cut -d'/' -f2)"
+	REPO="$(echo $SPLIT | cut -d'/' -f3)"
+	
+	if [ "$TOKEN" = "0" ]
+	then
+		echo "$(curl -s https://api.github.com/repos/$USER/$REPO)"
+	else
+		$AUTH_HEADER="Authorization: token $TOKEN"
+		echo "$(curl -s -H $AUTH_HEADER https://api.github.com/repos/$USER/$REPO)"
+	fi
+}
+
+# default root is directory of script
+ROOT="$(dirname $0)"
+QUITE_MODE=0
+INFO_MODE=0
+TOKEN=0
+DELAY=0
+
+OPTSTRING=":f:u:o:t:d:r:iqh"
+
+while getopts ${OPTSTRING} ARG
+do
+	case "${ARG}" in
+		f)	# use list of urls from a file
+			if [ -f $OPTARG ]
+			then
+				URLS="$(cat ${OPTARG})"
+			else
+				echo
+				echo "Error: file $OPTARG does not exist"
+				echo
+				exit 0
+			fi
+			;;
+		u)	# get list of repos for a user
+			URLS="$(curl -s https://api.github.com/users/$OPTARG/repos?per_page=200 | jq '.[].clone_url')"
+			;;
+		o) 	# get list of repos for a organization
+			URLS="$(curl -s https://api.github.com/orgs/$OPTARG/repos?per_page=200 | jq '.[].clone_url')"
+			;;
+		i) 	# only get information on repos, do not clone
+			INFO_MODE=1
+			;;
+		t)	# git api auth token
+			TOKEN="${OPTARG}"
+			;;
+		d)	# loop delay
+			DELAY="${OPTARG}"
+			;;
+		r)	# set root directory to create repos
+			if [ -d $OPTARG ]
+			then
+				ROOT="${OPTARG}"
+			else
+				echo
+				echo "Error: directory $OPTARG does not exist"
+				echo
+				exit 0
+			fi
+			;;
+		q) 	# tell git clone to supress output
+			QUITE_MODE=1
+			;;
+		h) 	# show description and help
+			echo -e $DESCRIPTION_TEXT
+			echo -e $SHORT_HELP_TEXT
+			echo -e $EXAMPLE_TEXT
+			exit 0
+			;;
+		:)	# no matching options
+			echo
+			echo " Invalid option"
+			echo -e $SHORT_HELP_TEXT
+			exit 0
+			;;
+		?) 	# show short help
+			echo
+			echo " Invalid option"
+			echo -e $SHORT_HELP_TEXT
+			exit 0
+			;;
+	esac
+done
+
+cd $ROOT
+
+shift $((OPTIND - 1))
+if [ "$1" != "" ]
+then
+	URLS=$1
+fi
+
+NUM_URLS="$(echo $URLS | wc -w)"
+
+if [ "$INFO_MODE" = "1" ]
+then	# get info only, do not clone
+	if [ "$NUM_URLS" -gt "1" ]
+	then
+		echo "{"
+	fi
+
+	for URL in $URLS
+	do
+		URL=${URL//\"/}
+		git_info $URL
+
+		sleep $DELAY
+	done
+
+	if [ "$NUM_URLS" -gt "1" ]
+	then
+		echo "}"
+	fi
+
+else	# clone repos
+	echo
+	for URL in $URLS
+	do
+		URL=${URL//\"/}
+		git_clone $URL
+
+		if [ "$NUM_URLS" -gt "1" ]
+		then
+			echo -------------------------
+		fi
+
+		NUM_URLS=$(($NUM_URLS - 1))
+		sleep $DELAY
+	done
+	echo
+fi
+
+
+
+
+

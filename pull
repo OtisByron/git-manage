@@ -1,0 +1,154 @@
+#!/bin/bash
+
+DESCRIPTION_TEXT="\n
+The pull script performs git pulls for the purpose of\n
+managing a local git server. Pulls are intended to\n
+update local repositories on the server.\n
+\n
+The script is able to accept single repository paths,\n
+a file with repository paths on each line, or generate\n
+a list of repositories located in the directory.\n
+\n
+The default root directory for file operations is the\n
+directory where the script is located.\n
+"
+EXAMPLE_TEXT="\n
+Examples:\n
+\n
+Pull a single git repository:\n
+   ./pull markqvist/Reticulum\n
+\n
+Pull git repositories from a list in a file:\n
+   ./pull -f ./git_repos.list\n
+\n
+Pull all git repositories quietly:\n
+   ./pull -a -q\n
+"
+SHORT_HELP_TEXT="\n
+Available options:\n
+\n
+[path]\t\t	use single repo path [path]\n
+-f [file]\t	use repo paths from file [file]\n
+-d [delay]\t	delay [delay] seconds between requests\n
+-r [dir]\t	use [dir] as root directory for cloning\n
+-q\t\t		quiet output\n
+-h\t\t		show full help message\n
+"
+
+function git_pull {
+	
+	REPO_PATH=$1
+	DIR="$(pwd)"
+
+	if [ -d $ROOT/$REPO_PATH ]
+	then
+		if [ "$QUITE_MODE" = "1" ]
+		then
+			cd $ROOT/$REPO_PATH
+			echo "$REPO_PATH"
+			git pull -q
+		else
+			cd $ROOT/$REPO_PATH
+			echo "$REPO_PATH"
+			git pull
+		fi
+	else
+		echo "$ROOT/$REPO_PATH does not exist, skipping"
+	fi
+
+	cd $DIR
+}
+
+# default root is directory of script
+ROOT="$(dirname $0)"
+ALL=0
+QUITE_MODE=0
+DELAY=0
+
+OPTSTRING=":f:d:r:aqh"
+
+while getopts ${OPTSTRING} ARG
+do
+	case "${ARG}" in
+		f)	# use list of urls from a file
+			if [ -f $OPTARG ]
+			then
+				REPOS="$(cat ${OPTARG})"
+			else
+				echo
+				echo "Error: file $OPTARG does not exist"
+				echo
+				exit 0
+			fi
+			;;
+		a)	# pull all repos
+			ALL=1
+			;;
+		d)	# loop delay
+			DELAY="${OPTARG}"
+			;;
+		r)	# set root directory to create repos
+			if [ -d $OPTARG ]
+			then
+				ROOT="${OPTARG}"
+			else
+				echo
+				echo "Error: directory $OPTARG does not exist"
+				echo
+				exit 0
+			fi
+			;;
+		q) 	# tell git clone to supress output
+			QUITE_MODE=1
+			;;
+		h) 	# show description and help
+			echo -e $DESCRIPTION_TEXT
+			echo -e $SHORT_HELP_TEXT
+			echo -e $EXAMPLE_TEXT
+			exit 0
+			;;
+		:)	# no matching options
+			echo
+			echo " Invalid option"
+			echo -e $SHORT_HELP_TEXT
+			exit 0
+			;;
+		?) 	# show short help
+			echo
+			echo " Invalid option"
+			echo -e $SHORT_HELP_TEXT
+			exit 0
+			;;
+	esac
+done
+
+cd $ROOT
+
+shift $((OPTIND - 1))
+if [ "$1" != "" ]
+then
+	REPOS=$1
+fi
+
+if [ "$ALL" != "0" ]
+then
+	REPOS="$(ls -d -1 */*/)"
+fi
+
+NUM_REPOS="$(echo $REPOS | wc -w)"
+
+echo
+for REPO in $REPOS
+do
+	git_pull $REPO
+		if [ "$NUM_REPOS" -gt "1" ]
+	then
+		echo -------------------------
+	fi
+		NUM_REPOS=$(($NUM_REPOS - 1))
+	sleep $DELAY
+done
+echo
+
+
+

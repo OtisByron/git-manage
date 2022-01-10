@@ -1,4 +1,4 @@
-# git
+# git-manage
 Local git server repository management scripts.
 
 The intent of this project is to simplify the management of a local git server, specifically a server that is mirroring repositories from GitHub.

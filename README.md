@@ -49,7 +49,7 @@ See the full help text for the script:
 
 The **pull** script uses the `git pull` command to pull the latest version of the specified repositories.
 
-The `-a` option will automatically generate a list of all repositories in the directory.
+The `-a` option will automatically generate a list of all repositories located in the directory.
 
 ### Examples
 

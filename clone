@@ -78,6 +78,7 @@ function git_clone {
 	then
 		if [ "$QUITE_MODE" = "1" ]
 		then
+			echo "$USER/$REPO"
 			git clone -q $URL $ROOT/$USER/$REPO
 		else
 			git clone $URL $ROOT/$USER/$REPO

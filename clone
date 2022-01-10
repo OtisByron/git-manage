@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# clone
+# Created by otisbyron
+# Jan 9 2022
+
 DESCRIPTION_TEXT="\n
 The clone script performs git clones for the purpose\n
 of managing a local git server. Git clones are\n
@@ -219,8 +223,3 @@ else	# clone repos
 	done
 	echo
 fi
-
-
-
-
-

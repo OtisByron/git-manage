@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# pull
+# Created by otisbyron
+# Jan 9 2022
+
 DESCRIPTION_TEXT="\n
 The pull script performs git pulls for the purpose of\n
 managing a local git server. Pulls are intended to\n
